@@ -18,7 +18,7 @@ export default function HomeScreen() {
   const router = useRouter();
   const { reports } = useReports();
 
-  const [lastUpdated, setLastUpdated] = useState("");
+  const [lastUpdated, setLastUpdated] = useState(""); //useState + useEffect
 
   useEffect(() => {
     setLastUpdated(
@@ -97,7 +97,7 @@ export default function HomeScreen() {
 
       <Pressable
         style={styles.primaryButton}
-        onPress={() => router.push("/create-report")}
+        onPress={() => router.push("/create-report")} //router.push()
       >
         <Text style={styles.primaryButtonText}>+ Buat Laporan Baru</Text>
       </Pressable>
@@ -106,6 +106,12 @@ export default function HomeScreen() {
         style={styles.secondaryButton}
         onPress={() => router.push("/explore")}
       >
+        <Pressable
+          style={styles.secondaryButton}
+          onPress={() => router.push("/weather")}
+        >
+          <Text style={styles.secondaryButtonText}>Informasi Cuaca Kampus</Text>
+        </Pressable>
         <Text style={styles.secondaryButtonText}>Informasi Aplikasi</Text>
       </Pressable>
     </ScrollView>
@@ -219,3 +225,7 @@ const styles = StyleSheet.create({
   },
   secondaryButtonText: { color: "#334155", fontWeight: "600" },
 });
+
+//but butten tulisanya hello kwtika di clik jadi selamat datang
+//buatkan button kalo di clik jadi brubah warna
+// ketika buttonya di tekan maka akan ada fungsu dimana butten akan menghitung ketika di tekan

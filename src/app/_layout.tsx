@@ -10,6 +10,12 @@ export default function RootLayout() {
       <ReportProvider>
         <Stack>
           <Stack.Screen
+            name="weather"
+            options={{
+              title: "Cuaca Area Kampus",
+            }}
+          />
+          <Stack.Screen
             name="index"
             options={{
               title: "CampusCare",

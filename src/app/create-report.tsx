@@ -17,7 +17,7 @@ export default function CreateReportScreen() {
   const router = useRouter();
   const { addReport } = useReports();
 
-  const [title, setTitle] = useState("");
+  const [title, setTitle] = useState(""); //state
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
@@ -42,7 +42,7 @@ export default function CreateReportScreen() {
     Alert.alert("Berhasil", "Laporan berhasil ditambahkan.", [
       {
         text: "OK",
-        onPress: () => router.replace("/"),
+        onPress: () => router.replace("/"), // router.replace() 
       },
     ]);
   }

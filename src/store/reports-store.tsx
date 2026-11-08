@@ -52,10 +52,9 @@ const initialReports: Report[] = [
 const ReportsContext = createContext<ReportsContextType | undefined>(undefined);
 
 export function ReportProvider({ children }: { children: React.ReactNode }) {
-  const [reports, setReports] = useState<Report[]>(initialReports);
+  const [reports, setReports] = useState<Report[]>(initialReports); //useState + useEffect
   const [isLoaded, setIsLoaded] = useState(false);
 
-  // Membaca data yang tersimpan ketika provider pertama kali dimuat.
   useEffect(() => {
     let active = true;
 

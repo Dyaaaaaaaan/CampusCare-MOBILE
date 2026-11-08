@@ -13,7 +13,7 @@ export default function DetailScreen() {
     return (
       <View style={styles.center}>
         <Text style={styles.title}>Laporan tidak ditemukan</Text>
-        <Pressable style={styles.button} onPress={() => router.back()}>
+        <Pressable style={styles.button} onPress={() => router.back()}> //router.back()
           <Text style={styles.buttonText}>Kembali</Text>
         </Pressable>
       </View>

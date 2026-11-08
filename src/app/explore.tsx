@@ -6,7 +6,7 @@ import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 export default function ExploreScreen() {
   const router = useRouter();
   const { reports } = useReports();
-  const [lastUpdated, setLastUpdated] = useState("");
+  const [lastUpdated, setLastUpdated] = useState(""); //useState + useEffect
 
   useEffect(() => {
     setLastUpdated(new Date().toLocaleString("id-ID"));
