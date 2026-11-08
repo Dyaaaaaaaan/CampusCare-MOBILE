@@ -29,9 +29,6 @@ export async function getCampusWeather(): Promise<WeatherData> {
 export function getWeatherWithPromise(): Promise<WeatherData> {
   return getCampusWeather()
     .then((data) => validateWeatherData(data))
-    .then((data) => {
-      return Promise.resolve(data);
-    })
     .catch((error: unknown) => {
       return Promise.reject(error);
     });
