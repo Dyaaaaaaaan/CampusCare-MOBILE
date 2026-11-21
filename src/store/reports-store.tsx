@@ -1,134 +1,212 @@
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { supabase } from "@/lib/supabase";
+import { useAuth } from "@/store/auth-context";
 import React, {
-    createContext,
-    useCallback,
-    useContext,
-    useEffect,
-    useState,
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
 } from "react";
 
-export type ReportStatus = "Menunggu" | "Diproses" | "Selesai";
+export const REPORT_STATUSES = ["Menunggu", "Diproses", "Selesai"] as const;
+export type ReportStatus = (typeof REPORT_STATUSES)[number];
 
+// Bentuk satu baris tabel `reports` di Supabase.
 export interface Report {
-  id: number;
+  id: string;
+  user_id: string;
   title: string;
   location: string;
   description: string;
   status: ReportStatus;
+  created_at: string;
 }
 
+export type NewReport = Pick<Report, "title" | "location" | "description">;
+
+// Semua aksi tulis mengembalikan pesan error (string) atau null jika sukses.
 interface ReportsContextType {
   reports: Report[];
-  addReport: (report: Omit<Report, "id">) => void;
-  isLoaded: boolean;
+  isLoading: boolean;
+  isRefreshing: boolean;
+  error: string | null;
+  refresh: () => Promise<void>;
+  addReport: (report: NewReport) => Promise<string | null>;
+  updateStatus: (report: Report, status: ReportStatus) => Promise<string | null>;
+  deleteReport: (report: Report) => Promise<string | null>;
 }
-
-const STORAGE_KEY = "@campuscare/reports";
-
-const initialReports: Report[] = [
-  {
-    id: 1,
-    title: "Lampu Kelas Mati",
-    location: "Gedung Kuliah Bersama",
-    description: "Lampu di kelas 101 tidak menyala.",
-    status: "Diproses",
-  },
-  {
-    id: 2,
-    title: "Kursi Rusak",
-    location: "Laboratorium Informatika",
-    description: "Beberapa kursi perlu diperbaiki.",
-    status: "Menunggu",
-  },
-  {
-    id: 3,
-    title: "Keran Air Rusak",
-    location: "Gedung Teknik",
-    description: "Keran air di toilet lantai dua tidak berfungsi.",
-    status: "Selesai",
-  },
-];
 
 const ReportsContext = createContext<ReportsContextType | undefined>(undefined);
 
+const byNewest = (a: Report, b: Report) =>
+  b.created_at.localeCompare(a.created_at);
+
 export function ReportProvider({ children }: { children: React.ReactNode }) {
-  const [reports, setReports] = useState<Report[]>(initialReports); //useState + useEffect
-  const [isLoaded, setIsLoaded] = useState(false);
+  const { user } = useAuth();
+  const userId = user?.id ?? null;
 
-  useEffect(() => {
-    let active = true;
+  const [reports, setReports] = useState<Report[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    async function loadReports() {
-      try {
-        const savedReports = await AsyncStorage.getItem(STORAGE_KEY);
+  // Mencegah respons lama menimpa data setelah user berganti / logout.
+  const requestId = useRef(0);
 
-        if (!active) return;
+  // READ (SELECT): urut dari terbaru. Isolasi data dijaga oleh RLS di database,
+  // sehingga tidak ada filter user_id di sisi client.
+  const load = useCallback(async (mode: "initial" | "refresh") => {
+    const current = ++requestId.current;
+    if (mode === "initial") setIsLoading(true);
+    else setIsRefreshing(true);
+    setError(null);
 
-        if (savedReports !== null) {
-          const parsedReports: unknown = JSON.parse(savedReports);
+    try {
+      const { data, error: queryError } = await supabase
+        .from("reports")
+        .select("*")
+        .order("created_at", { ascending: false });
 
-          if (
-            Array.isArray(parsedReports) &&
-            parsedReports.every(
-              (item) =>
-                item &&
-                typeof item.id === "number" &&
-                typeof item.title === "string" &&
-                typeof item.location === "string" &&
-                typeof item.description === "string" &&
-                ["Menunggu", "Diproses", "Selesai"].includes(item.status),
-            )
-          ) {
-            setReports(parsedReports as Report[]);
-          }
-        } else {
-          // Simpan data awal hanya saat belum ada data tersimpan.
-          await AsyncStorage.setItem(
-            STORAGE_KEY,
-            JSON.stringify(initialReports),
-          );
-        }
-      } catch (error) {
-        console.error("Gagal memuat laporan:", error);
-      } finally {
-        if (active) setIsLoaded(true);
+      if (current !== requestId.current) return;
+
+      if (queryError) {
+        setError(queryError.message);
+      } else {
+        setReports((data ?? []) as Report[]);
+      }
+    } catch (caught) {
+      if (current !== requestId.current) return;
+      setError(caught instanceof Error ? caught.message : "Gagal memuat laporan.");
+    } finally {
+      if (current === requestId.current) {
+        setIsLoading(false);
+        setIsRefreshing(false);
       }
     }
-
-    loadReports();
-
-    return () => {
-      active = false;
-    };
   }, []);
 
-  // Menyimpan laporan setelah data awal selesai dimuat.
   useEffect(() => {
-    if (!isLoaded) return;
+    if (!userId) {
+      // Logout: kosongkan data agar tidak bocor ke akun berikutnya.
+      requestId.current++;
+      setReports([]);
+      setError(null);
+      setIsLoading(false);
+      setIsRefreshing(false);
+      return;
+    }
 
-    AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(reports)).catch(
-      (error: unknown) => {
-        console.error("Gagal menyimpan laporan:", error);
-      },
-    );
-  }, [reports, isLoaded]);
+    load("initial");
+  }, [userId, load]);
 
-  const addReport = useCallback((newReport: Omit<Report, "id">) => {
-    setReports((currentReports) => {
-      const nextId =
-        currentReports.length > 0
-          ? Math.max(...currentReports.map((report) => report.id)) + 1
-          : 1;
+  const refresh = useCallback(() => load("refresh"), [load]);
 
-      return [{ ...newReport, id: nextId }, ...currentReports];
-    });
-  }, []);
+  // CREATE (INSERT) + Optimistic UI.
+  const addReport = useCallback(
+    async (input: NewReport): Promise<string | null> => {
+      if (!userId) return "Anda belum masuk.";
 
-  return (
-    <ReportsContext.Provider value={{ reports, addReport, isLoaded }}>
-      {children}
-    </ReportsContext.Provider>
+      const tempId = `temp-${Date.now()}`;
+      const optimistic: Report = {
+        id: tempId,
+        user_id: userId,
+        ...input,
+        status: "Menunggu",
+        created_at: new Date().toISOString(),
+      };
+
+      setReports((current) => [optimistic, ...current]);
+
+      try {
+        const { data, error: insertError } = await supabase
+          .from("reports")
+          .insert({ ...input, status: "Menunggu", user_id: userId })
+          .select()
+          .single();
+
+        if (insertError || !data) {
+          throw new Error(insertError?.message ?? "Gagal menyimpan laporan.");
+        }
+
+        // Ganti data sementara dengan baris asli dari server.
+        setReports((current) =>
+          current.map((item) => (item.id === tempId ? (data as Report) : item)),
+        );
+        return null;
+      } catch (caught) {
+        // Rollback.
+        setReports((current) => current.filter((item) => item.id !== tempId));
+        return caught instanceof Error ? caught.message : "Gagal menyimpan laporan.";
+      }
+    },
+    [userId],
   );
+
+  // UPDATE + Optimistic UI.
+  const updateStatus = useCallback(
+    async (report: Report, status: ReportStatus): Promise<string | null> => {
+      setReports((current) =>
+        current.map((item) => (item.id === report.id ? { ...item, status } : item)),
+      );
+
+      try {
+        const { error: updateError } = await supabase
+          .from("reports")
+          .update({ status })
+          .eq("id", report.id);
+
+        if (updateError) throw new Error(updateError.message);
+        return null;
+      } catch (caught) {
+        // Rollback ke status sebelumnya.
+        setReports((current) =>
+          current.map((item) => (item.id === report.id ? report : item)),
+        );
+        return caught instanceof Error ? caught.message : "Gagal memperbarui status.";
+      }
+    },
+    [],
+  );
+
+  // DELETE + Optimistic UI.
+  const deleteReport = useCallback(
+    async (report: Report): Promise<string | null> => {
+      setReports((current) => current.filter((item) => item.id !== report.id));
+
+      try {
+        const { error: deleteError } = await supabase
+          .from("reports")
+          .delete()
+          .eq("id", report.id);
+
+        if (deleteError) throw new Error(deleteError.message);
+        return null;
+      } catch (caught) {
+        // Rollback: kembalikan item lalu urutkan ulang.
+        setReports((current) => [...current, report].sort(byNewest));
+        return caught instanceof Error ? caught.message : "Gagal menghapus laporan.";
+      }
+    },
+    [],
+  );
+
+  const value = useMemo<ReportsContextType>(
+    () => ({
+      reports,
+      isLoading,
+      isRefreshing,
+      error,
+      refresh,
+      addReport,
+      updateStatus,
+      deleteReport,
+    }),
+    [reports, isLoading, isRefreshing, error, refresh, addReport, updateStatus, deleteReport],
+  );
+
+  return <ReportsContext.Provider value={value}>{children}</ReportsContext.Provider>;
 }
 
 export function useReports() {

@@ -1,7 +1,16 @@
+import { useAuth } from "@/store/auth-context";
 import { Report, useReports } from "@/store/reports-store";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import {
+  ActivityIndicator,
+  Pressable,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
 
 function statusColor(status: Report["status"]) {
   switch (status) {
@@ -16,7 +25,11 @@ function statusColor(status: Report["status"]) {
 
 export default function HomeScreen() {
   const router = useRouter();
-  const { reports } = useReports();
+  const { user, signOut } = useAuth();
+  const { reports, isLoading, isRefreshing, error, refresh } = useReports();
+
+  const displayName =
+    (user?.user_metadata?.full_name as string | undefined) ?? user?.email ?? "";
 
   const [lastUpdated, setLastUpdated] = useState("");
 
@@ -38,7 +51,26 @@ export default function HomeScreen() {
   const completed = reports.filter((r) => r.status === "Selesai").length;
 
   return (
-    <ScrollView style={styles.screen} contentContainerStyle={styles.content}>
+    <ScrollView
+      style={styles.screen}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl refreshing={isRefreshing} onRefresh={refresh} />
+      }
+    >
+      {/* INFO USER + SIGN OUT */}
+
+      <View style={styles.userBar}>
+        <View style={styles.userInfo}>
+          <Text style={styles.userName}>{displayName}</Text>
+          <Text style={styles.userEmail}>{user?.email}</Text>
+        </View>
+
+        <Pressable style={styles.signOut} onPress={signOut}>
+          <Text style={styles.signOutText}>Keluar</Text>
+        </Pressable>
+      </View>
+
       <Text style={styles.eyebrow}>SISTEM PELAPORAN FASILITAS KAMPUS</Text>
 
       <Text style={styles.title}>CampusCare</Text>
@@ -71,7 +103,20 @@ export default function HomeScreen() {
         <Text style={styles.count}>{reports.length} laporan</Text>
       </View>
 
-      {reports.length === 0 ? (
+      {isLoading && reports.length === 0 ? (
+        <View style={styles.stateCard}>
+          <ActivityIndicator size="large" color="#2563eb" />
+          <Text style={styles.stateText}>Memuat laporan...</Text>
+        </View>
+      ) : error ? (
+        <View style={styles.stateCard}>
+          <Text style={styles.errorTitle}>Gagal memuat laporan</Text>
+          <Text style={styles.stateText}>{error}</Text>
+          <Pressable style={styles.retry} onPress={refresh}>
+            <Text style={styles.retryText}>Coba Lagi</Text>
+          </Pressable>
+        </View>
+      ) : reports.length === 0 ? (
         <Text style={styles.empty}>Belum ada laporan fasilitas.</Text>
       ) : (
         reports.map((report) => (
@@ -81,7 +126,7 @@ export default function HomeScreen() {
             onPress={() =>
               router.push({
                 pathname: "/detail",
-                params: { id: String(report.id) },
+                params: { id: report.id },
               })
             }
           >
@@ -124,6 +169,15 @@ export default function HomeScreen() {
         <Text style={styles.secondaryButtonText}>Informasi Cuaca Kampus</Text>
       </Pressable>
 
+      {/* TOMBOL DEMO SECURESTORE */}
+
+      <Pressable
+        style={styles.secondaryButton}
+        onPress={() => router.push("/vault")}
+      >
+        <Text style={styles.secondaryButtonText}>Brankas Token (SecureStore)</Text>
+      </Pressable>
+
       {/* TOMBOL INFORMASI APLIKASI */}
 
       <Pressable
@@ -155,6 +209,77 @@ function Summary({
 }
 
 const styles = StyleSheet.create({
+  userBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    padding: 12,
+    marginBottom: 18,
+  },
+
+  userInfo: {
+    flex: 1,
+  },
+
+  userName: {
+    color: "#0f172a",
+    fontSize: 14,
+    fontWeight: "700",
+  },
+
+  userEmail: {
+    color: "#64748b",
+    fontSize: 12,
+    marginTop: 2,
+  },
+
+  signOut: {
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+    borderRadius: 10,
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+  },
+
+  signOutText: {
+    color: "#334155",
+    fontWeight: "700",
+    fontSize: 13,
+  },
+
+  stateCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 14,
+    padding: 24,
+    alignItems: "center",
+  },
+
+  stateText: {
+    color: "#64748b",
+    marginTop: 12,
+    textAlign: "center",
+  },
+
+  errorTitle: {
+    color: "#dc2626",
+    fontWeight: "700",
+    fontSize: 16,
+  },
+
+  retry: {
+    backgroundColor: "#2563eb",
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 18,
+    marginTop: 14,
+  },
+
+  retryText: {
+    color: "#ffffff",
+    fontWeight: "700",
+  },
+
   screen: {
     flex: 1,
     backgroundColor: "#f1f5f9",
