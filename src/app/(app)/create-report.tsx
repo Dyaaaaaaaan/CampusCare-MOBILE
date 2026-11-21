@@ -2,7 +2,7 @@ import { useReports } from "@/store/reports-store";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {
-    Alert,
+    ActivityIndicator,
     KeyboardAvoidingView,
     Platform,
     Pressable,
@@ -21,8 +21,12 @@ export default function CreateReportScreen() {
   const [location, setLocation] = useState("");
   const [description, setDescription] = useState("");
   const [error, setError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function handleSubmit() {
+  async function handleSubmit() {
+    // Cegah multiple submission.
+    if (submitting) return;
+
     const cleanTitle = title.trim();
     const cleanLocation = location.trim();
     const cleanDescription = description.trim();
@@ -32,19 +36,24 @@ export default function CreateReportScreen() {
       return;
     }
 
-    addReport({
+    setError("");
+    setSubmitting(true);
+
+    // INSERT ke Supabase (Optimistic UI: daftar di Home langsung diperbarui).
+    const failure = await addReport({
       title: cleanTitle,
       location: cleanLocation,
       description: cleanDescription,
-      status: "Menunggu",
     });
 
-    Alert.alert("Berhasil", "Laporan berhasil ditambahkan.", [
-      {
-        text: "OK",
-        onPress: () => router.replace("/"), // router.replace() 
-      },
-    ]);
+    setSubmitting(false);
+
+    if (failure) {
+      setError(failure);
+      return;
+    }
+
+    router.replace("/"); // router.replace()
   }
 
   return (
@@ -87,8 +96,16 @@ export default function CreateReportScreen() {
 
           {error ? <Text style={styles.error}>{error}</Text> : null}
 
-          <Pressable style={styles.submit} onPress={handleSubmit}>
-            <Text style={styles.submitText}>Kirim Laporan</Text>
+          <Pressable
+            style={[styles.submit, submitting && styles.submitDisabled]}
+            onPress={handleSubmit}
+            disabled={submitting}
+          >
+            {submitting ? (
+              <ActivityIndicator color="#ffffff" />
+            ) : (
+              <Text style={styles.submitText}>Kirim Laporan</Text>
+            )}
           </Pressable>
 
           <Pressable style={styles.cancel} onPress={() => router.back()}>
@@ -126,6 +143,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     marginTop: 12,
   },
+  submitDisabled: { opacity: 0.7 },
   submitText: { color: "#ffffff", fontWeight: "700" },
   cancel: { padding: 14, alignItems: "center" },
   cancelText: { color: "#475569", fontWeight: "600" },

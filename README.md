@@ -1,3 +1,10 @@
+# CampusCare (Mobile)
+
+Aplikasi pelaporan fasilitas kampus berbasis Expo + Supabase (Auth, Postgres + RLS, SecureStore).
+Panduan setup dan skenario demo Modul 4: [docs/DEMO-MODUL-4.md](docs/DEMO-MODUL-4.md).
+
+---
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
